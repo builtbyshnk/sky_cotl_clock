@@ -278,12 +278,19 @@ function App() {
       return;
     }
 
+    const smoothWheelState = new WeakMap<
+      Element,
+      { animationFrame: number; targetTop: number }
+    >();
     const timers = new WeakMap<Element, number>();
-    const listeners = new WeakMap<Element, EventListener>();
+    const scrollListeners = new WeakMap<Element, EventListener>();
+    const wheelListeners = new WeakMap<Element, EventListener>();
     const watched = new Set<Element>();
 
     const markScrolling = (element: Element) => {
-      element.setAttribute("data-scrolling", "true");
+      if (element.getAttribute("data-scrolling") !== "true") {
+        element.setAttribute("data-scrolling", "true");
+      }
 
       const existingTimer = timers.get(element);
       if (existingTimer) {
@@ -299,6 +306,59 @@ function App() {
       );
     };
 
+    const smoothWheel = (element: Element, event: WheelEvent) => {
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+
+      const isLikelyTrackpad =
+        event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && Math.abs(event.deltaY) < 40;
+
+      if (isLikelyTrackpad || !event.deltaY) {
+        return;
+      }
+
+      event.preventDefault();
+      markScrolling(element);
+
+      const multiplier =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 36
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? element.clientHeight
+            : 1;
+      const delta = event.deltaY * multiplier;
+      const maxTop = element.scrollHeight - element.clientHeight;
+      const state =
+        smoothWheelState.get(element) ??
+        { animationFrame: 0, targetTop: element.scrollTop };
+
+      state.targetTop = Math.max(0, Math.min(maxTop, state.targetTop + delta));
+
+      if (state.animationFrame) {
+        smoothWheelState.set(element, state);
+        return;
+      }
+
+      const glide = () => {
+        const distance = state.targetTop - element.scrollTop;
+
+        if (Math.abs(distance) < 0.5) {
+          element.scrollTop = state.targetTop;
+          state.animationFrame = 0;
+          smoothWheelState.delete(element);
+          return;
+        }
+
+        element.scrollTop += distance * 0.18;
+        state.animationFrame = window.requestAnimationFrame(glide);
+        smoothWheelState.set(element, state);
+      };
+
+      state.animationFrame = window.requestAnimationFrame(glide);
+      smoothWheelState.set(element, state);
+    };
+
     const bindScrollbars = () => {
       document.querySelectorAll(".theme-scrollbar").forEach((element) => {
         if (watched.has(element)) {
@@ -306,10 +366,17 @@ function App() {
         }
 
         watched.add(element);
-        const listener = () => markScrolling(element);
-        listeners.set(element, listener);
-        element.addEventListener("scroll", listener, {
+        const scrollListener = () => markScrolling(element);
+        const wheelListener = ((event: WheelEvent) =>
+          smoothWheel(element, event)) as EventListener;
+
+        scrollListeners.set(element, scrollListener);
+        wheelListeners.set(element, wheelListener);
+        element.addEventListener("scroll", scrollListener, {
           passive: true,
+        });
+        element.addEventListener("wheel", wheelListener, {
+          passive: false,
         });
       });
     };
@@ -328,9 +395,19 @@ function App() {
         }
 
         element.removeAttribute("data-scrolling");
-        const listener = listeners.get(element);
-        if (listener) {
-          element.removeEventListener("scroll", listener);
+        const smoothState = smoothWheelState.get(element);
+        if (smoothState?.animationFrame) {
+          window.cancelAnimationFrame(smoothState.animationFrame);
+        }
+
+        const scrollListener = scrollListeners.get(element);
+        if (scrollListener) {
+          element.removeEventListener("scroll", scrollListener);
+        }
+
+        const wheelListener = wheelListeners.get(element);
+        if (wheelListener) {
+          element.removeEventListener("wheel", wheelListener);
         }
       });
     };

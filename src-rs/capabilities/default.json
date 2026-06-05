@@ -11,6 +11,8 @@
     "core:window:allow-set-position",
     "core:window:allow-set-size",
     "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-visible-on-all-workspaces",
+    "core:window:allow-set-always-on-top",
     "core:window:allow-theme",
     "core:app:allow-set-app-theme",
     "global-shortcut:allow-register",

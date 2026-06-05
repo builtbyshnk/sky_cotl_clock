@@ -3,8 +3,8 @@ import { emitTo } from "@tauri-apps/api/event";
 import {
   getAllWindows,
   getCurrentWindow,
-  LogicalPosition,
   LogicalSize,
+  PhysicalPosition,
   primaryMonitor,
 } from "@tauri-apps/api/window";
 import type { AppSettings } from "@/domain/types";
@@ -55,6 +55,8 @@ export async function configureOverlayWindow(settings: AppSettings) {
     return;
   }
 
+  await current.setVisibleOnAllWorkspaces(true);
+  await current.setAlwaysOnTop(true);
   await current.setIgnoreCursorEvents(settings.overlay.clickThrough);
   const size = overlaySize(settings);
   await current.setSize(new LogicalSize(size.width, size.height));
@@ -79,19 +81,22 @@ export async function positionOverlay(settings: AppSettings) {
   const top = workArea.position.y;
   const right = left + workArea.size.width;
   const bottom = top + workArea.size.height;
+  const physicalWidth = Math.round(size.width * monitor.scaleFactor);
+  const physicalHeight = Math.round(size.height * monitor.scaleFactor);
+  const physicalMargin = Math.round(OVERLAY_MARGIN * monitor.scaleFactor);
 
   const x =
     settings.overlay.position === "top-left" ||
     settings.overlay.position === "bottom-left"
-      ? left + OVERLAY_MARGIN
-      : right - size.width - OVERLAY_MARGIN;
+      ? left + physicalMargin
+      : right - physicalWidth - physicalMargin;
   const y =
     settings.overlay.position === "bottom-left" ||
     settings.overlay.position === "bottom-right"
-      ? bottom - size.height - OVERLAY_MARGIN
-      : top + OVERLAY_MARGIN;
+      ? bottom - physicalHeight - physicalMargin
+      : top + physicalMargin;
 
-  await overlay.setPosition(new LogicalPosition(Math.round(x), Math.round(y)));
+  await overlay.setPosition(new PhysicalPosition(Math.round(x), Math.round(y)));
 }
 
 export async function toggleOverlay(settings: AppSettings) {
@@ -114,6 +119,8 @@ export async function toggleOverlay(settings: AppSettings) {
   }
 
   await positionOverlay(settings);
+  await overlay.setVisibleOnAllWorkspaces(true);
+  await overlay.setAlwaysOnTop(true);
   await overlay.show();
   await emitTo("overlay", "sky-overlay-visibility", true);
 }

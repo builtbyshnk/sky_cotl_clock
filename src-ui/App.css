@@ -224,10 +224,13 @@ body[data-window-label="overlay"] #root {
   --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 26%, transparent);
   --scrollbar-thumb-hover: color-mix(in oklch, var(--primary) 64%, var(--muted-foreground));
   --scrollbar-thumb-active: color-mix(in oklch, var(--primary) 82%, var(--foreground));
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 [data-sidebar="content"].theme-scrollbar {
