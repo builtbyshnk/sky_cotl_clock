@@ -11,6 +11,12 @@ The app is Windows-first and includes:
 - Light, dark, and system theme modes
 - Local planner storage for goals and wishlist state
 
+## Product Demo
+
+![Isekai product demo](assets/product-demo.gif)
+
+[View MP4 demo](assets/export-1780652649327.mp4)
+
 ## Development
 
 ```bash
