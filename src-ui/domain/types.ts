@@ -58,6 +58,11 @@ export interface AppSettings {
   };
   overlay: {
     enabled: boolean;
+    gameDetection: {
+      enabled: boolean;
+      startupDelayMs: number;
+      processNames: string[];
+    };
     mode: "clock" | "route" | "mini-map" | "clock-route";
     position:
       | "top-right"

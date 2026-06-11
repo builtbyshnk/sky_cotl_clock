@@ -831,6 +831,51 @@ export function OverlaySettingsPage({
                 onSettingsChange({ ...settings, overlay: { ...settings.overlay, enabled } })
               }
             />
+            <Separator />
+            <SettingSwitch
+              label="Auto-show when Sky starts"
+              description="Detect the Sky process at the OS level and show the overlay after the launch delay."
+              checked={settings.overlay.gameDetection.enabled}
+              onCheckedChange={(enabled) =>
+                onSettingsChange({
+                  ...settings,
+                  overlay: {
+                    ...settings.overlay,
+                    gameDetection: {
+                      ...settings.overlay.gameDetection,
+                      enabled,
+                    },
+                  },
+                })
+              }
+            />
+            <SliderSetting
+              label="Launch delay"
+              value={settings.overlay.gameDetection.startupDelayMs / 1_000}
+              min={2}
+              max={5}
+              step={1}
+              display={`${settings.overlay.gameDetection.startupDelayMs / 1_000}s`}
+              onValueChange={(seconds) =>
+                onSettingsChange({
+                  ...settings,
+                  overlay: {
+                    ...settings.overlay,
+                    gameDetection: {
+                      ...settings.overlay.gameDetection,
+                      startupDelayMs: seconds * 1_000,
+                    },
+                  },
+                })
+              }
+            />
+            <div className="rounded-md border border-border/70 bg-muted/25 p-3 text-xs text-muted-foreground">
+              Detection checks process names only:{" "}
+              {settings.overlay.gameDetection.processNames.join(", ")}. It does
+              not read game memory, inject code, inspect network traffic, or
+              automate input.
+            </div>
+            <Separator />
             <div className="grid gap-2">
               <Label htmlFor="overlay-mode">Layout</Label>
               <Select

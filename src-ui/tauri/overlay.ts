@@ -151,6 +151,28 @@ export async function toggleOverlay(settings: AppSettings) {
   await emitTo("overlay", "sky-overlay-visibility", true);
 }
 
+export async function showOverlay(settings: AppSettings) {
+  if (!settings.overlay.enabled) {
+    return;
+  }
+
+  const overlay = await findWindow("overlay");
+
+  if (!overlay) {
+    return;
+  }
+
+  if (await overlay.isVisible()) {
+    return;
+  }
+
+  await positionOverlay(settings);
+  await overlay.setVisibleOnAllWorkspaces(true);
+  await overlay.setAlwaysOnTop(true);
+  await overlay.show();
+  await emitTo("overlay", "sky-overlay-visibility", true);
+}
+
 export async function showMainWindow() {
   const main = await findWindow("main");
 

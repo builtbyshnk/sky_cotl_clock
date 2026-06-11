@@ -35,6 +35,11 @@ const OVERLAY_MODES: AppSettings["overlay"]["mode"][] = [
   "mini-map",
   "clock-route",
 ];
+const SKY_PROCESS_NAMES = [
+  "Sky.exe",
+  "Sky",
+  "Sky-Win64-Shipping.exe",
+];
 
 export const EVENT_DEFINITIONS: EventDefinition[] = [
   {
@@ -115,6 +120,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   overlay: {
     enabled: true,
+    gameDetection: {
+      enabled: false,
+      startupDelayMs: 3_000,
+      processNames: SKY_PROCESS_NAMES,
+    },
     mode: "clock",
     position: "top-right",
     opacity: 0.92,
@@ -164,6 +174,13 @@ export function mergeSettings(stored: Partial<AppSettings> | null): AppSettings 
   const overlay = {
     ...DEFAULT_SETTINGS.overlay,
     ...stored.overlay,
+    gameDetection: {
+      ...DEFAULT_SETTINGS.overlay.gameDetection,
+      ...stored.overlay?.gameDetection,
+      processNames:
+        stored.overlay?.gameDetection?.processNames?.filter(Boolean) ??
+        DEFAULT_SETTINGS.overlay.gameDetection.processNames,
+    },
     miniMap: {
       ...DEFAULT_SETTINGS.overlay.miniMap,
       ...stored.overlay?.miniMap,
@@ -183,6 +200,17 @@ export function mergeSettings(stored: Partial<AppSettings> | null): AppSettings 
       maxEvents: Math.round(
         clampNumber(overlay.maxEvents, 3, 8, DEFAULT_SETTINGS.overlay.maxEvents),
       ),
+      gameDetection: {
+        ...overlay.gameDetection,
+        startupDelayMs: Math.round(
+          clampNumber(
+            overlay.gameDetection.startupDelayMs,
+            2_000,
+            5_000,
+            DEFAULT_SETTINGS.overlay.gameDetection.startupDelayMs,
+          ),
+        ),
+      },
       miniMap: {
         ...overlay.miniMap,
         size: Math.round(

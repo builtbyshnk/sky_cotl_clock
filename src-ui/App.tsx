@@ -34,8 +34,10 @@ import {
   getWindowLabel,
   isTauriRuntime,
   registerAppHotkeys,
+  showOverlay,
   toggleOverlay,
 } from "@/tauri/overlay";
+import { isGameProcessRunning } from "@/tauri/game-detection";
 import {
   CalendarPage,
   CollectionPage,
@@ -171,10 +173,20 @@ function App() {
   const [updateState, setUpdateState] = useState<AppUpdateState>(initialUpdateState);
   const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
   const pendingUpdate = useRef<Update | null>(null);
+  const latestSettings = useRef(settings);
+  const gamePresence = useRef({
+    running: false,
+    overlayShownForLaunch: false,
+    showTimer: 0,
+  });
   const enabledEventsKey = useMemo(
     () => JSON.stringify(settings.events),
     [settings.events],
   );
+
+  useEffect(() => {
+    latestSettings.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     void getWindowLabel().then((label) => {
@@ -398,6 +410,91 @@ function App() {
     settings.hotkeys.toggleOverlay,
     settings.hotkeys.toggleRouteTargetComplete,
     settings.overlay.enabled,
+    windowLabel,
+  ]);
+
+  useEffect(() => {
+    if (
+      windowLabel !== "main" ||
+      !settings.overlay.enabled ||
+      !settings.overlay.gameDetection.enabled ||
+      !isTauriRuntime()
+    ) {
+      const state = gamePresence.current;
+      if (state.showTimer) {
+        window.clearTimeout(state.showTimer);
+        state.showTimer = 0;
+      }
+      state.running = false;
+      state.overlayShownForLaunch = false;
+      return;
+    }
+
+    let cancelled = false;
+    const state = gamePresence.current;
+    const processNames = settings.overlay.gameDetection.processNames;
+    const delayMs = settings.overlay.gameDetection.startupDelayMs;
+
+    const scheduleOverlay = () => {
+      if (state.overlayShownForLaunch || state.showTimer) {
+        return;
+      }
+
+      state.showTimer = window.setTimeout(async () => {
+        state.showTimer = 0;
+        if (cancelled || state.overlayShownForLaunch) {
+          return;
+        }
+
+        const stillRunning = await isGameProcessRunning(processNames).catch(
+          () => false,
+        );
+        if (!cancelled && stillRunning) {
+          await showOverlay(latestSettings.current);
+          state.overlayShownForLaunch = true;
+        }
+      }, delayMs);
+    };
+
+    const checkPresence = async () => {
+      const running = await isGameProcessRunning(processNames).catch(() => false);
+      if (cancelled) {
+        return;
+      }
+
+      if (running) {
+        if (!state.running) {
+          state.running = true;
+        }
+        scheduleOverlay();
+      }
+
+      if (!running && state.running) {
+        state.running = false;
+        state.overlayShownForLaunch = false;
+        if (state.showTimer) {
+          window.clearTimeout(state.showTimer);
+          state.showTimer = 0;
+        }
+      }
+    };
+
+    void checkPresence();
+    const interval = window.setInterval(() => void checkPresence(), 2_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      if (state.showTimer) {
+        window.clearTimeout(state.showTimer);
+        state.showTimer = 0;
+      }
+    };
+  }, [
+    settings.overlay.enabled,
+    settings.overlay.gameDetection.enabled,
+    settings.overlay.gameDetection.processNames,
+    settings.overlay.gameDetection.startupDelayMs,
     windowLabel,
   ]);
 
