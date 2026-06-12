@@ -15,17 +15,24 @@ describe("locale resolution", () => {
     expect(resolveLocale("es-ES")).toBe("es");
     expect(resolveLocale("zh-CN")).toBe("zh-Hans");
     expect(resolveLocale("zh-SG")).toBe("zh-Hans");
+    expect(resolveLocale("it-IT")).toBe("it");
+    expect(resolveLocale("ko-KR")).toBe("ko");
+    expect(resolveLocale("id-ID")).toBe("id");
+    expect(resolveLocale("tr-TR")).toBe("tr");
+    expect(resolveLocale("vi-VN")).toBe("vi");
+    expect(resolveLocale("bn-BD")).toBe("bn");
   });
 
   test("falls back to English for unsupported or empty locale codes", () => {
-    expect(resolveLocale("ko-KR")).toBe(DEFAULT_LOCALE);
+    expect(resolveLocale("nl-NL")).toBe(DEFAULT_LOCALE);
     expect(resolveLocale("")).toBe(DEFAULT_LOCALE);
     expect(resolveLocale(undefined)).toBe(DEFAULT_LOCALE);
   });
 
   test("detects first supported browser language", () => {
-    expect(detectPreferredLocale(["ko-KR", "ru-RU", "en-US"])).toBe("ru");
-    expect(detectPreferredLocale(["ko-KR", "en-GB"])).toBe("en");
+    expect(detectPreferredLocale(["nl-NL", "ru-RU", "en-US"])).toBe("ru");
+    expect(detectPreferredLocale(["nl-NL", "en-GB"])).toBe("en");
+    expect(detectPreferredLocale(["nl-NL", "ko-KR", "en-US"])).toBe("ko");
   });
 
   test("reports right-to-left direction for Arabic only", () => {

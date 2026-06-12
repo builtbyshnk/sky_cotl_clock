@@ -1,13 +1,19 @@
 import { useMemo } from "react";
 import { ar } from "./messages/ar";
+import { bn } from "./messages/bn";
 import { de } from "./messages/de";
 import { en, type MessageKey } from "./messages/en";
 import { es } from "./messages/es";
 import { fr } from "./messages/fr";
 import { hi } from "./messages/hi";
+import { id } from "./messages/id";
+import { it } from "./messages/it";
 import { ja } from "./messages/ja";
+import { ko } from "./messages/ko";
 import { pt } from "./messages/pt";
 import { ru } from "./messages/ru";
+import { tr } from "./messages/tr";
+import { vi } from "./messages/vi";
 import { zhHans } from "./messages/zh-Hans";
 
 export type LocaleCode =
@@ -20,7 +26,13 @@ export type LocaleCode =
   | "fr"
   | "pt"
   | "de"
-  | "ja";
+  | "ja"
+  | "it"
+  | "ko"
+  | "id"
+  | "tr"
+  | "vi"
+  | "bn";
 
 export type LocaleDirection = "ltr" | "rtl";
 
@@ -42,6 +54,12 @@ export const SUPPORTED_LOCALES: Array<{
   { code: "pt", nativeName: "Português", englishName: "Portuguese", direction: "ltr" },
   { code: "de", nativeName: "Deutsch", englishName: "German", direction: "ltr" },
   { code: "ja", nativeName: "日本語", englishName: "Japanese", direction: "ltr" },
+  { code: "it", nativeName: "Italiano", englishName: "Italian", direction: "ltr" },
+  { code: "ko", nativeName: "한국어", englishName: "Korean", direction: "ltr" },
+  { code: "id", nativeName: "Bahasa Indonesia", englishName: "Indonesian", direction: "ltr" },
+  { code: "tr", nativeName: "Türkçe", englishName: "Turkish", direction: "ltr" },
+  { code: "vi", nativeName: "Tiếng Việt", englishName: "Vietnamese", direction: "ltr" },
+  { code: "bn", nativeName: "বাংলা", englishName: "Bengali", direction: "ltr" },
 ];
 
 const SUPPORTED_CODES = new Set<LocaleCode>(
@@ -59,6 +77,12 @@ const MESSAGES: Record<LocaleCode, Record<MessageKey, string>> = {
   pt,
   de,
   ja,
+  it,
+  ko,
+  id,
+  tr,
+  vi,
+  bn,
 };
 
 export function resolveLocale(locale: string | undefined | null): LocaleCode {
