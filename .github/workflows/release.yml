@@ -121,7 +121,7 @@ jobs:
               changelog,
               `[View GitHub release](${process.env.RELEASE_URL})`,
               "",
-              ""
+              "\u200b"
             ].join("\n"),
             flags: 4,
             allowed_mentions: {
