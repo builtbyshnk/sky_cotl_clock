@@ -1,9 +1,10 @@
 const repo = "radcolor/sky_cotl_clock";
 const releasesUrl = `https://github.com/${repo}/releases/latest`;
 const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
-const currentVersion = "0.1.4";
+const currentVersion = "0.1.6";
 
 const downloadButton = document.querySelector("#downloadButton");
+const alternateDownloadLink = document.querySelector("#alternateDownloadLink");
 const packageVersion = document.querySelector("#packageVersion");
 const cursorLight = document.querySelector(".cursor-light");
 const previewVideo = document.querySelector(".app-window video");
@@ -43,8 +44,16 @@ function setTheme(theme, persist = true) {
   themeToggleText.textContent = isDark ? "Light" : "Dark";
 }
 
-function chooseDownloadAsset(assets) {
-  const preferredExtensions = [".msi", ".exe", ".zip"];
+function isMacOS() {
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  const userAgent = navigator.userAgent || "";
+
+  return /mac/i.test(platform) || /Macintosh|Mac OS X/i.test(userAgent);
+}
+
+function chooseDownloadAsset(assets, platform) {
+  const preferredExtensions =
+    platform === "macos" ? [".dmg"] : [".msi", ".exe", ".zip"];
 
   return preferredExtensions
     .map((extension) =>
@@ -54,6 +63,9 @@ function chooseDownloadAsset(assets) {
 }
 
 async function hydrateLatestRelease() {
+  const preferredPlatform = isMacOS() ? "macos" : "windows";
+  const alternatePlatform = preferredPlatform === "macos" ? "windows" : "macos";
+
   try {
     const response = await fetch(apiUrl, {
       headers: { Accept: "application/vnd.github+json" },
@@ -64,20 +76,33 @@ async function hydrateLatestRelease() {
     }
 
     const release = await response.json();
-    const asset = chooseDownloadAsset(release.assets || []);
+    const assets = release.assets || [];
+    const asset = chooseDownloadAsset(assets, preferredPlatform);
+    const alternateAsset = chooseDownloadAsset(assets, alternatePlatform);
     const version = release.tag_name || `v${currentVersion}`;
 
     if (asset) {
       downloadButton.href = asset.browser_download_url;
-      downloadButton.querySelector("span").textContent = `Download ${version}`;
-      return;
+      downloadButton.querySelector("span").textContent =
+        preferredPlatform === "macos" ? `Download macOS ${version}` : `Download Windows ${version}`;
+    } else {
+      downloadButton.href = release.html_url || releasesUrl;
+      downloadButton.querySelector("span").textContent = `View ${version}`;
     }
 
-    downloadButton.href = release.html_url || releasesUrl;
-    downloadButton.querySelector("span").textContent = `View ${version}`;
+    if (alternateDownloadLink) {
+      alternateDownloadLink.href = alternateAsset?.browser_download_url || release.html_url || releasesUrl;
+      alternateDownloadLink.textContent =
+        alternatePlatform === "windows" ? "Download for Windows" : "Download for macOS";
+    }
   } catch (error) {
     downloadButton.href = releasesUrl;
     downloadButton.querySelector("span").textContent = "Download latest version";
+
+    if (alternateDownloadLink) {
+      alternateDownloadLink.href = releasesUrl;
+      alternateDownloadLink.textContent = "Download for Windows";
+    }
   }
 }
 

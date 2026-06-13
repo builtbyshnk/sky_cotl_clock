@@ -293,6 +293,21 @@ h3 {
   margin-top: 28px;
 }
 
+.alternate-download {
+  display: inline-flex;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-color: rgba(22, 139, 151, 0.42);
+  text-underline-offset: 4px;
+}
+
+.alternate-download:hover {
+  color: var(--accent-strong);
+}
+
 .button {
   position: relative;
   display: inline-flex;

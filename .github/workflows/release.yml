@@ -15,10 +15,21 @@ on:
     types: [published]
 
 jobs:
-  release-windows:
-    name: Build Windows MSI
+  release:
+    name: Build ${{ matrix.name }}
     if: github.event_name != 'release' && inputs.notifyDiscordOnly != true
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows MSI
+            os: windows-latest
+            tauriArgs: --bundles msi
+          - name: macOS DMG
+            os: macos-latest
+            tauriArgs: --target universal-apple-darwin --bundles dmg
 
     permissions:
       contents: write
@@ -34,6 +45,10 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install macOS Rust targets
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -51,6 +66,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: bun run tauri
+          args: ${{ matrix.tauriArgs }}
           tagName: v__VERSION__
           releaseName: "Isekai v__VERSION__"
           releaseBody: "See the assets to download and install this version."
