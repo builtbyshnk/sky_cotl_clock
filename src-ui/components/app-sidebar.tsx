@@ -25,7 +25,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +88,12 @@ const sections: Array<{
   },
 ];
 
+export const PAGE_SECTION_KEYS = Object.fromEntries(
+  sections.flatMap((section) =>
+    section.items.map((item) => [item.id, section.titleKey] as const),
+  ),
+) as Record<AppPage, MessageKey>;
+
 const themeOptions = [
   { id: "dark", titleKey: "settings.theme.dark.label", icon: Moon },
   { id: "light", titleKey: "settings.theme.light.label", icon: Sun },
@@ -107,14 +112,10 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const { t } = useI18n(settings.language);
-  const activeTheme =
-    themeOptions.find((theme) => theme.id === settings.theme) ?? themeOptions[0];
-  const ActiveThemeIcon = activeTheme.icon;
-
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarContent className="group-data-[collapsible=icon]:pt-2">
-        <SidebarGroup className="px-0 pt-2 group-data-[collapsible=icon]:hidden">
+    <Sidebar collapsible="none" {...props}>
+      <SidebarContent>
+        <SidebarGroup className="px-0 pt-2">
           <SidebarGroupContent>
             <Calendar
               mode="single"
@@ -125,7 +126,7 @@ export function AppSidebar({
             />
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarSeparator className="mx-0 group-data-[collapsible=icon]:hidden" />
+        <SidebarSeparator className="mx-0" />
         {sections.map((section) => (
           <SidebarSection
             key={section.titleKey}
@@ -139,7 +140,7 @@ export function AppSidebar({
         ))}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
-        <div className="grid gap-2.5 px-2 group-data-[collapsible=icon]:hidden">
+        <div className="grid gap-2.5 px-2">
           <div className="flex items-center justify-between gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/35 px-2 py-1.5 text-xs text-sidebar-foreground/75">
             <span className="font-medium">Open goals</span>
             <Badge variant="secondary" className="h-5 rounded-sm">
@@ -160,20 +161,7 @@ export function AppSidebar({
           ) : null}
           <ThemeTabs value={settings.theme} onValueChange={onThemeChange} t={t} />
         </div>
-        <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              type="button"
-              tooltip={`${t("settings.info.theme")}: ${t(activeTheme.titleKey)}`}
-              onClick={() => onThemeChange(nextTheme(settings.theme))}
-            >
-              <ActiveThemeIcon />
-              <span>{t(activeTheme.titleKey)}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }
@@ -219,11 +207,6 @@ function ThemeTabs({
   );
 }
 
-function nextTheme(current: AppSettings["theme"]) {
-  const currentIndex = themeOptions.findIndex((theme) => theme.id === current);
-  return themeOptions[(currentIndex + 1) % themeOptions.length].id;
-}
-
 function SidebarSection({
   title,
   items,
@@ -240,8 +223,8 @@ function SidebarSection({
   t: (key: MessageKey) => string;
 }) {
   return (
-    <SidebarGroup className="px-3 py-1 group-data-[collapsible=icon]:px-2">
-      <SidebarGroupLabel className="h-7 px-1 text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
+    <SidebarGroup className="px-3 py-1">
+      <SidebarGroupLabel className="h-7 px-1 text-sidebar-foreground/70">
         {title}
       </SidebarGroupLabel>
       <SidebarGroupContent>
@@ -252,7 +235,7 @@ function SidebarSection({
                 type="button"
                 isActive={activePage === item.id}
                 tooltip={t(item.titleKey)}
-                className="h-8 px-2.5 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2!"
+                className="h-8 px-2.5"
                 onClick={() => onPageChange(item.id)}
               >
                 <item.icon />

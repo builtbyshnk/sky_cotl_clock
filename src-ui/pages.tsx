@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type * as React from "react";
+import type { AnimationEvent } from "react";
 import { createPortal } from "react-dom";
 import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown from "react-markdown";
@@ -40,18 +41,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
@@ -101,15 +97,40 @@ import { isTauriRuntime } from "@/tauri/overlay";
 
 type SkyDataModule = typeof import("@/data/skygame");
 
-const COMMON_TIME_ZONES = [
+const LOCAL_TIME_ZONE_OPTIONS = [
   "UTC",
   "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
   "America/New_York",
+  "America/Toronto",
+  "America/Mexico_City",
+  "America/Sao_Paulo",
+  "America/Buenos_Aires",
   "Europe/London",
   "Europe/Paris",
-  "Asia/Calcutta",
+  "Europe/Berlin",
+  "Europe/Amsterdam",
+  "Europe/Madrid",
+  "Europe/Rome",
+  "Europe/Istanbul",
+  "Europe/Moscow",
+  "Africa/Cairo",
+  "Asia/Dubai",
+  "Asia/Riyadh",
+  "Asia/Kolkata",
+  "Asia/Karachi",
+  "Asia/Bangkok",
+  "Asia/Jakarta",
+  "Asia/Singapore",
+  "Asia/Manila",
+  "Asia/Hong_Kong",
+  "Asia/Taipei",
+  "Asia/Shanghai",
   "Asia/Tokyo",
+  "Asia/Seoul",
   "Australia/Sydney",
+  "Pacific/Auckland",
 ];
 
 const OVERLAY_POSITION_OPTIONS: Array<{
@@ -214,14 +235,8 @@ const DISCORD_RPC_PRESET_OPTIONS: Array<{
 ];
 
 function getTimeZoneOptions(selectedTimeZone: string) {
-  const intlWithValues = Intl as typeof Intl & {
-    supportedValuesOf?: (key: "timeZone") => string[];
-  };
-  const supportedTimeZones =
-    intlWithValues.supportedValuesOf?.("timeZone") ?? COMMON_TIME_ZONES;
-
   return Array.from(
-    new Set([selectedTimeZone, ...supportedTimeZones, ...COMMON_TIME_ZONES]),
+    new Set([...LOCAL_TIME_ZONE_OPTIONS, selectedTimeZone]),
   ).filter(Boolean);
 }
 
@@ -618,44 +633,42 @@ export function RoutesPage({
           <CardContent className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="route-realm">Realm</Label>
-              <Select
+              <NativeSelect
+                id="route-realm"
+                className="w-full"
                 value={selectedRealmGuid}
-                onValueChange={(realmGuid) => updateRoute({ realmGuid })}
+                onChange={(event) =>
+                  updateRoute({ realmGuid: event.target.value })
+                }
                 disabled={!skyData}
               >
-                <SelectTrigger id="route-realm" className="w-full">
-                  <SelectValue placeholder="Choose realm" />
-                </SelectTrigger>
-                <SelectContent>
-                  {realms.map((realm) => (
-                    <SelectItem key={realm.guid} value={realm.guid}>
-                      {realm.shortName ?? realm.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {realms.map((realm) => (
+                  <NativeSelectOption key={realm.guid} value={realm.guid}>
+                    {realm.shortName ?? realm.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="route-area">Area</Label>
-              <Select
+              <NativeSelect
+                id="route-area"
+                className="w-full"
                 value={selectedAreaGuid}
-                onValueChange={(areaGuid) => updateRoute({ areaGuid })}
+                onChange={(event) =>
+                  updateRoute({ areaGuid: event.target.value })
+                }
                 disabled={!skyData || areas.length === 0}
               >
-                <SelectTrigger id="route-area" className="w-full">
-                  <SelectValue placeholder="Choose area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {areas.map((area) => {
-                    const route = skyData?.skyDataIndex.getAreaRoute(area.guid);
-                    return (
-                      <SelectItem key={area.guid} value={area.guid}>
-                        {area.name} ({route?.counts.total ?? 0})
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                {areas.map((area) => {
+                  const route = skyData?.skyDataIndex.getAreaRoute(area.guid);
+                  return (
+                    <NativeSelectOption key={area.guid} value={area.guid}>
+                      {area.name} ({route?.counts.total ?? 0})
+                    </NativeSelectOption>
+                  );
+                })}
+              </NativeSelect>
             </div>
             <Separator />
             <SettingSwitch
@@ -1195,26 +1208,27 @@ export function OverlaySettingsPage({
             <Separator />
             <div className="grid gap-2">
               <Label htmlFor="overlay-mode">{t("overlay.layout")}</Label>
-              <Select
+              <NativeSelect
+                id="overlay-mode"
+                className="w-full"
                 value={selectedMode}
-                onValueChange={(mode: AppSettings["overlay"]["mode"]) =>
+                onChange={(event) =>
                   onSettingsChange({
                     ...settings,
-                    overlay: { ...settings.overlay, mode },
+                    overlay: {
+                      ...settings.overlay,
+                      mode: event.target
+                        .value as AppSettings["overlay"]["mode"],
+                    },
                   })
                 }
               >
-                <SelectTrigger id="overlay-mode" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {OVERLAY_MODE_OPTIONS.map((mode) => (
-                    <SelectItem key={mode.value} value={mode.value}>
-                      {modeLabels.get(mode.value) ?? t(mode.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {OVERLAY_MODE_OPTIONS.map((mode) => (
+                  <NativeSelectOption key={mode.value} value={mode.value}>
+                    {modeLabels.get(mode.value) ?? t(mode.labelKey)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
               <p className="text-xs text-muted-foreground">
                 {t("overlay.settings.modeCycleHelp")}
               </p>
@@ -1228,26 +1242,27 @@ export function OverlaySettingsPage({
             />
             <div className="grid gap-2">
               <Label htmlFor="overlay-position">{t("overlay.position")}</Label>
-              <Select
+              <NativeSelect
+                id="overlay-position"
+                className="w-full"
                 value={settings.overlay.position}
-                onValueChange={(position: AppSettings["overlay"]["position"]) =>
+                onChange={(event) =>
                   onSettingsChange({
                     ...settings,
-                    overlay: { ...settings.overlay, position },
+                    overlay: {
+                      ...settings.overlay,
+                      position: event.target
+                        .value as AppSettings["overlay"]["position"],
+                    },
                   })
                 }
               >
-                <SelectTrigger id="overlay-position" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {OVERLAY_POSITION_OPTIONS.map((position) => (
-                    <SelectItem key={position.value} value={position.value}>
-                      {t(position.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {OVERLAY_POSITION_OPTIONS.map((position) => (
+                  <NativeSelectOption key={position.value} value={position.value}>
+                    {t(position.labelKey)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
             </div>
             <SliderSetting
               label={t("overlay.opacity")}
@@ -1410,58 +1425,54 @@ export function DiscordRpcPage({
             <Separator />
             <div className="grid gap-2">
               <Label htmlFor="discord-rpc-mode">{t("discordRpc.mode")}</Label>
-              <Select
+              <NativeSelect
+                id="discord-rpc-mode"
+                className="w-full"
                 value={settings.discordRpc.mode}
-                onValueChange={(mode: AppSettings["discordRpc"]["mode"]) =>
+                onChange={(event) =>
                   onSettingsChange({
                     ...settings,
-                    discordRpc: { ...settings.discordRpc, mode },
+                    discordRpc: {
+                      ...settings.discordRpc,
+                      mode: event.target
+                        .value as AppSettings["discordRpc"]["mode"],
+                    },
                   })
                 }
               >
-                <SelectTrigger id="discord-rpc-mode" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {DISCORD_RPC_MODE_OPTIONS.map((mode) => (
-                      <SelectItem key={mode.value} value={mode.value}>
-                        {t(mode.labelKey)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                {DISCORD_RPC_MODE_OPTIONS.map((mode) => (
+                  <NativeSelectOption key={mode.value} value={mode.value}>
+                    {t(mode.labelKey)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
               <p className="text-xs text-muted-foreground">
                 {t(selectedMode.descriptionKey)}
               </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="discord-rpc-preset">{t("discordRpc.safePreset")}</Label>
-              <Select
+              <NativeSelect
+                id="discord-rpc-preset"
+                className="w-full"
                 value={settings.discordRpc.safePreset}
-                onValueChange={(
-                  safePreset: AppSettings["discordRpc"]["safePreset"],
-                ) =>
+                onChange={(event) =>
                   onSettingsChange({
                     ...settings,
-                    discordRpc: { ...settings.discordRpc, safePreset },
+                    discordRpc: {
+                      ...settings.discordRpc,
+                      safePreset: event.target
+                        .value as AppSettings["discordRpc"]["safePreset"],
+                    },
                   })
                 }
               >
-                <SelectTrigger id="discord-rpc-preset" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {DISCORD_RPC_PRESET_OPTIONS.map((preset) => (
-                      <SelectItem key={preset.value} value={preset.value}>
-                        {t(preset.labelKey)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                {DISCORD_RPC_PRESET_OPTIONS.map((preset) => (
+                  <NativeSelectOption key={preset.value} value={preset.value}>
+                    {t(preset.labelKey)}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
               <p className="text-xs text-muted-foreground">
                 {t(selectedPreset.descriptionKey)}
               </p>
@@ -1569,13 +1580,87 @@ export function DiscordRpcPage({
   );
 }
 
+export type SettingsTab = "appearance" | "events" | "hotkeys" | "time";
+
+const SETTINGS_TAB_KEYS: Record<SettingsTab, MessageKey> = {
+  appearance: "settings.appearance.title",
+  events: "settings.tab.events",
+  hotkeys: "settings.tab.hotkeys",
+  time: "settings.tab.time",
+};
+
+const SETTINGS_TABS: Array<{
+  id: SettingsTab;
+  labelKey: MessageKey;
+  icon: React.ElementType;
+}> = [
+  { id: "appearance", labelKey: SETTINGS_TAB_KEYS.appearance, icon: Palette },
+  { id: "events", labelKey: SETTINGS_TAB_KEYS.events, icon: CalendarClock },
+  { id: "hotkeys", labelKey: SETTINGS_TAB_KEYS.hotkeys, icon: Keyboard },
+  { id: "time", labelKey: SETTINGS_TAB_KEYS.time, icon: Clock },
+];
+
+export function settingsTabTitleKey(tab: SettingsTab): MessageKey {
+  return SETTINGS_TAB_KEYS[tab];
+}
+
+function SettingsTabTransition({
+  activeTab,
+  children,
+}: {
+  activeTab: SettingsTab;
+  children: (visibleTab: SettingsTab) => React.ReactNode;
+}) {
+  const [visibleTab, setVisibleTab] = useState(activeTab);
+  const [isExiting, setIsExiting] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === visibleTab) {
+      setIsExiting(false);
+      return;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVisibleTab(activeTab);
+      setIsExiting(false);
+      return;
+    }
+
+    setIsExiting(true);
+  }, [activeTab, visibleTab]);
+
+  function handleAnimationEnd(event: AnimationEvent<HTMLDivElement>) {
+    if (event.animationName !== "page-fade-out" || !isExiting) {
+      return;
+    }
+
+    setVisibleTab(activeTab);
+    setIsExiting(false);
+  }
+
+  return (
+    <div
+      key={visibleTab}
+      className="page-transition mt-4"
+      data-exiting={isExiting}
+      onAnimationEnd={handleAnimationEnd}
+    >
+      {children(visibleTab)}
+    </div>
+  );
+}
+
 export function SettingsPage({
   settings,
   hotkeyError,
+  activeTab,
+  onActiveTabChange,
   onSettingsChange,
 }: {
   settings: AppSettings;
   hotkeyError: string;
+  activeTab: SettingsTab;
+  onActiveTabChange: (tab: SettingsTab) => void;
   onSettingsChange: (settings: AppSettings) => void;
 }) {
   const { t } = useI18n(settings.language);
@@ -1665,8 +1750,12 @@ export function SettingsPage({
           </div>
         }
       />
-      <Tabs defaultValue="appearance" className="p-5">
-        <div className="flex flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => onActiveTabChange(value as SettingsTab)}
+        className="p-5"
+      >
+        <div className="flex flex-col gap-4 border-b border-border pb-5">
           <div className="grid gap-1">
             <p className="text-sm font-semibold text-foreground">
               {t("settings.preferences")}
@@ -1675,27 +1764,22 @@ export function SettingsPage({
               {settings.display.localTimeZone} / {settings.display.timeFormat}
             </p>
           </div>
-          <TabsList className="h-10 w-full justify-start lg:w-auto">
-            <TabsTrigger value="appearance" className="h-8 gap-2 px-4 text-sm">
-              <Palette className="size-4" />
-              {t("settings.appearance.title")}
-            </TabsTrigger>
-            <TabsTrigger value="events" className="h-8 gap-2 px-4 text-sm">
-              <CalendarClock className="size-4" />
-              {t("settings.tab.events")}
-            </TabsTrigger>
-            <TabsTrigger value="hotkeys" className="h-8 gap-2 px-4 text-sm">
-              <Keyboard className="size-4" />
-              {t("settings.tab.hotkeys")}
-            </TabsTrigger>
-            <TabsTrigger value="time" className="h-8 gap-2 px-4 text-sm">
-              <Clock className="size-4" />
-              {t("settings.tab.time")}
-            </TabsTrigger>
+          <TabsList>
+            {SETTINGS_TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger key={tab.id} value={tab.id}>
+                  <Icon />
+                  {t(tab.labelKey)}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
         </div>
 
-        <TabsContent value="appearance" className="mt-4">
+        <SettingsTabTransition activeTab={activeTab}>
+          {(visibleTab) =>
+            visibleTab === "appearance" ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <SettingsPanel
               icon={<Palette />}
@@ -1730,26 +1814,26 @@ export function SettingsPage({
               </SettingGroup>
               <Separator />
               <SettingGroup label={t("common.language")}>
-                <Select
+                <NativeSelect
+                  id="language"
+                  className="w-full"
                   value={settings.language}
-                  onValueChange={(language: LocaleCode) =>
-                    onSettingsChange({ ...settings, language })
+                  onChange={(event) =>
+                    onSettingsChange({
+                      ...settings,
+                      language: event.target.value as LocaleCode,
+                    })
                   }
                 >
-                  <SelectTrigger id="language" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUPPORTED_LOCALES.map((locale) => (
-                      <SelectItem key={locale.code} value={locale.code}>
-                        {locale.nativeName}
-                        {locale.nativeName === locale.englishName
-                          ? ""
-                          : ` / ${locale.englishName}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {SUPPORTED_LOCALES.map((locale) => (
+                    <NativeSelectOption key={locale.code} value={locale.code}>
+                      {locale.nativeName}
+                      {locale.nativeName === locale.englishName
+                        ? ""
+                        : ` / ${locale.englishName}`}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
                 <p className="text-xs text-muted-foreground">
                   {t("settings.language.description")}
                 </p>
@@ -1831,9 +1915,7 @@ export function SettingsPage({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="events" className="mt-4">
+            ) : visibleTab === "events" ? (
           <SettingsPanel
             icon={<CalendarClock />}
             title={t("settings.events.title")}
@@ -1869,9 +1951,7 @@ export function SettingsPage({
               ))}
             </div>
           </SettingsPanel>
-        </TabsContent>
-
-        <TabsContent value="hotkeys" className="mt-4">
+            ) : visibleTab === "hotkeys" ? (
           <SettingsPanel
             icon={<Keyboard />}
             title={t("settings.hotkeys.title")}
@@ -1907,9 +1987,7 @@ export function SettingsPage({
               </div>
             ) : null}
           </SettingsPanel>
-        </TabsContent>
-
-        <TabsContent value="time" className="mt-4">
+            ) : visibleTab === "time" ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <SettingsPanel
               icon={<Clock />}
@@ -1970,28 +2048,28 @@ export function SettingsPage({
                 </div>
               </SettingGroup>
               <SettingGroup label={t("settings.time.localTimezone")}>
-                <Select
+                <NativeSelect
+                  id="local-timezone"
+                  className="w-full"
                   value={settings.display.localTimeZone}
-                  onValueChange={(localTimeZone) =>
+                  onChange={(event) =>
                     onSettingsChange({
                       ...settings,
-                      display: { ...settings.display, localTimeZone },
+                      display: {
+                        ...settings.display,
+                        localTimeZone: event.target.value,
+                      },
                     })
                   }
                 >
-                  <SelectTrigger id="local-timezone" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getTimeZoneOptions(settings.display.localTimeZone).map(
-                      (timeZone) => (
-                        <SelectItem key={timeZone} value={timeZone}>
-                          {timeZone}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
+                  {getTimeZoneOptions(settings.display.localTimeZone).map(
+                    (timeZone) => (
+                      <NativeSelectOption key={timeZone} value={timeZone}>
+                        {timeZone}
+                      </NativeSelectOption>
+                    ),
+                  )}
+                </NativeSelect>
               </SettingGroup>
             </SettingsPanel>
             <Card>
@@ -2010,7 +2088,9 @@ export function SettingsPage({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+            ) : null
+          }
+        </SettingsTabTransition>
       </Tabs>
       <HotkeyCaptureDialog
         target={capturingHotkey}

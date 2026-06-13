@@ -14,15 +14,14 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minus, PanelLeft, Square, X } from "lucide-react";
+import { Minus, Square, X } from "lucide-react";
 import { toast } from "sonner";
 import "./App.css";
-import { AppSidebar, type AppPage } from "@/components/app-sidebar";
-import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { AppSidebar, PAGE_SECTION_KEYS, type AppPage } from "@/components/app-sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { DEFAULT_SETTINGS, mergeSettings } from "@/domain/settings";
 import { generateEventInstances } from "@/domain/events";
 import {
@@ -63,6 +62,8 @@ import {
   PageHeader,
   RoutesPage,
   SettingsPage,
+  settingsTabTitleKey,
+  type SettingsTab,
   UpdatesPage,
 } from "@/pages";
 import {
@@ -188,6 +189,7 @@ function App() {
   const [reminders, setReminders] =
     useState<Record<string, boolean>>(readStoredReminders);
   const [activePage, setActivePage] = useState<AppPage>("overview");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("appearance");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [now, setNow] = useState(() => new Date());
   const [windowLabel, setWindowLabel] = useState<string | null>(null);
@@ -201,6 +203,10 @@ function App() {
   });
   const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">("dark");
   const { t } = useI18n(settings.language);
+  const titlebarPageTitle = useMemo(
+    () => buildTitlebarPageTitle(activePage, settingsTab, t),
+    [activePage, settingsTab, t],
+  );
   const pendingUpdate = useRef<Update | null>(null);
   const latestSettings = useRef(settings);
   const gamePresence = useRef({
@@ -923,7 +929,7 @@ function App() {
     <TooltipProvider>
       <div className="app-main-shell flex h-svh min-h-0 flex-col overflow-hidden">
         <SidebarProvider className="min-h-0 flex-1 flex-col">
-          <AppTitlebar pageTitle={t(pageTitleKey(activePage))} />
+          <AppTitlebar pageTitle={titlebarPageTitle} />
           <div className="app-workspace flex min-h-0 flex-1">
             <AppSidebar
               activePage={activePage}
@@ -956,6 +962,8 @@ function App() {
                   onToggleReminder={(event) => void toggleReminder(event)}
                   onRefreshUpdate={() => void refreshUpdate()}
                   onInstallUpdate={() => void installUpdate()}
+                  settingsTab={settingsTab}
+                  onSettingsTabChange={setSettingsTab}
                 />
               </div>
             </SidebarInset>
@@ -986,6 +994,8 @@ function PageTransition({
   onToggleReminder,
   onRefreshUpdate,
   onInstallUpdate,
+  settingsTab,
+  onSettingsTabChange,
 }: {
   activePage: AppPage;
   now: Date;
@@ -1005,6 +1015,8 @@ function PageTransition({
   onToggleReminder: (event: EventInstance) => void;
   onRefreshUpdate: () => void;
   onInstallUpdate: () => void;
+  settingsTab: SettingsTab;
+  onSettingsTabChange: (tab: SettingsTab) => void;
 }) {
   const [visiblePage, setVisiblePage] = useState(activePage);
   const [isExiting, setIsExiting] = useState(false);
@@ -1059,13 +1071,14 @@ function PageTransition({
         onToggleReminder={onToggleReminder}
         onRefreshUpdate={onRefreshUpdate}
         onInstallUpdate={onInstallUpdate}
+        settingsTab={settingsTab}
+        onSettingsTabChange={onSettingsTabChange}
       />
     </div>
   );
 }
 
 function AppTitlebar({ pageTitle }: { pageTitle: string }) {
-  const { toggleSidebar } = useSidebar();
   const isMac = navigator.userAgent.includes("Mac");
   const safeWindowAction = (
     action: (windowControls: ReturnType<typeof getCurrentWindow>) => Promise<void>,
@@ -1083,25 +1096,12 @@ function AppTitlebar({ pageTitle }: { pageTitle: string }) {
         data-tauri-drag-region
         className="app-titlebar-drag flex h-full min-w-0 flex-1 items-center"
       >
-        <div
-          data-tauri-drag-region
-          className={cn(
-            "app-titlebar-leading flex h-full shrink-0 items-center border-r border-sidebar-border",
-            isMac
-              ? "w-[calc(var(--sidebar-width-icon)+6.75rem)] justify-end pr-4"
-              : "w-(--sidebar-width-icon) justify-center",
-          )}
-        >
-          <button
-            type="button"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar"
-            className="app-titlebar-sidebar-toggle flex size-8 items-center justify-center text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            onClick={toggleSidebar}
-          >
-            <PanelLeft className="size-4" />
-          </button>
-        </div>
+        {isMac ? (
+          <div
+            data-tauri-drag-region
+            className="w-[4.5rem] shrink-0 border-r border-sidebar-border"
+          />
+        ) : null}
         <div
           data-tauri-drag-region
           className="flex h-full min-w-0 flex-1 items-center gap-3 px-4"
@@ -1221,6 +1221,8 @@ function PageContent({
   onToggleReminder,
   onRefreshUpdate,
   onInstallUpdate,
+  settingsTab,
+  onSettingsTabChange,
 }: {
   activePage: AppPage;
   now: Date;
@@ -1240,6 +1242,8 @@ function PageContent({
   onToggleReminder: (event: EventInstance) => void;
   onRefreshUpdate: () => void;
   onInstallUpdate: () => void;
+  settingsTab: SettingsTab;
+  onSettingsTabChange: (tab: SettingsTab) => void;
 }) {
   const { t } = useI18n(settings.language);
   if (activePage === "overview") {
@@ -1308,6 +1312,8 @@ function PageContent({
       <SettingsPage
         settings={settings}
         hotkeyError={hotkeyError}
+        activeTab={settingsTab}
+        onActiveTabChange={onSettingsTabChange}
         onSettingsChange={onSettingsChange}
       />
     );
@@ -1329,6 +1335,20 @@ function PageContent({
       description={t("page.notFound.description")}
     />
   );
+}
+
+function buildTitlebarPageTitle(
+  page: AppPage,
+  settingsTab: SettingsTab,
+  t: (key: MessageKey) => string,
+): string {
+  const pageLabel = t(pageTitleKey(page));
+
+  if (page === "settings") {
+    return `${pageLabel} > ${t(settingsTabTitleKey(settingsTab))}`;
+  }
+
+  return `${t(PAGE_SECTION_KEYS[page])} > ${pageLabel}`;
 }
 
 function pageTitleKey(page: AppPage): MessageKey {
