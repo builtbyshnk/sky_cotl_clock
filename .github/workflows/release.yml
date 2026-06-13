@@ -5,10 +5,13 @@ on:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types: [published]
 
 jobs:
   release-windows:
     name: Build Windows MSI
+    if: github.event_name != 'release'
     runs-on: windows-latest
 
     permissions:
@@ -50,3 +53,62 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: false
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch].[ext]"
+
+  notify-discord:
+    name: Notify Discord
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send release notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "Missing DISCORD_RELEASE_WEBHOOK_URL repository secret."
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const body = process.env.RELEASE_BODY?.trim();
+          const description = body && body.length > 0
+            ? body.slice(0, 3900)
+            : "A new Isekai app update is available.";
+
+          const payload = {
+            username: "Isekai Releases",
+            content: `New Isekai app update is here: ${process.env.RELEASE_URL}`,
+            allowed_mentions: {
+              parse: []
+            },
+            embeds: [
+              {
+                title: `${process.env.RELEASE_NAME || process.env.RELEASE_TAG} is here`,
+                url: process.env.RELEASE_URL,
+                description,
+                color: process.env.RELEASE_PRERELEASE === "true" ? 16763904 : 5814783,
+                fields: [
+                  {
+                    name: "Version",
+                    value: process.env.RELEASE_TAG,
+                    inline: true
+                  }
+                ]
+              }
+            ]
+          };
+
+          fs.writeFileSync("discord-payload.json", JSON.stringify(payload));
+          NODE
+
+          curl --fail \
+            -H "Content-Type: application/json" \
+            -d @discord-payload.json \
+            "$DISCORD_WEBHOOK_URL"
