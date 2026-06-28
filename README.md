@@ -25,8 +25,8 @@ https://github.com/user-attachments/assets/c1aa4cb3-f4ac-4f88-bf0a-91947119247c
 
 ## Support
 
-For questions, feedback, and release support, join the Isekai Discord:
-https://discord.gg/a7vGCk7XQa
+For questions, feedback, and release support, message on Telegram:
+https://t.me/radcolordev
 
 If Isekai helps you and you want to support the work, you can donate here:
 https://radcolor.dev/donate
