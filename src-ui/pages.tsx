@@ -83,19 +83,35 @@ import {
   type MessageKey,
 } from "@/i18n";
 import type {
+  SkyAreaSummary,
   SkyAreaRoute,
   SkyCalendarEntry,
   SkyCandleGroup,
+  SkyCandleRun,
   SkyCandleRunSummary,
   SkyItemSummary,
+  SkyMiniMapPin,
+  SkyRealmSummary,
   SkyRouteTarget,
 } from "@/data/skygame";
-import { countCandleGroupWax, skyDataIndex } from "@/data/skygame";
 import { formatBytes, type AppUpdateState } from "@/tauri/updater";
 import type { DiscordRpcStatus } from "@/tauri/discord-rpc";
 import { isTauriRuntime } from "@/tauri/overlay";
-
-type SkyDataModule = typeof import("@/data/skygame");
+import {
+  getSkyActiveRouteTarget,
+  getSkyArea,
+  getSkyAreaRoute,
+  getSkyAreasForRealm,
+  getSkyCalendarEntries,
+  getSkyCandleRun,
+  getSkyCandleRuns,
+  getSkyMiniMapPins,
+  getSkyRealms,
+  getSkyRouteTargets,
+  getUpcomingSkySeasonalEntries,
+  searchSkyItems,
+  type SkyActiveRouteTargetState,
+} from "@/tauri/skygame";
 
 const LOCAL_TIME_ZONE_OPTIONS = [
   "UTC",
@@ -240,36 +256,6 @@ function getTimeZoneOptions(selectedTimeZone: string) {
   ).filter(Boolean);
 }
 
-function useSkyData(options: { defer?: boolean } = {}) {
-  const [module, setModule] = useState<SkyDataModule | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    let timeoutId: number | null = null;
-
-    const load = () => void import("@/data/skygame").then((loaded) => {
-      if (mounted) {
-        setModule(loaded);
-      }
-    });
-
-    if (options.defer) {
-      timeoutId = window.setTimeout(load, 180);
-    } else {
-      load();
-    }
-
-    return () => {
-      mounted = false;
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [options.defer]);
-
-  return module;
-}
-
 function toDateIso(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -281,6 +267,10 @@ function addDaysIso(date: string, days: number) {
   const parsed = new Date(`${date}T00:00:00.000Z`);
   parsed.setUTCDate(parsed.getUTCDate() + days);
   return parsed.toISOString().slice(0, 10);
+}
+
+function countCandleGroupWax(group: SkyCandleGroup) {
+  return group.candles.reduce((total, candle) => total + candle.c, 0);
 }
 
 export function PageHeader({
@@ -324,18 +314,25 @@ export function OverviewPage({
   onToggleOverlay: () => void;
   onToggleReminder: (event: EventInstance) => void;
 }) {
-  const skyData = useSkyData({ defer: true });
   const skyClock = skyNow(now);
   const upcoming = events.find((event) => event.status === "upcoming");
   const dailyReset = events.find((event) => event.definitionId === "daily-reset");
   const edenReset = events.find((event) => event.definitionId === "eden-reset");
-  const nextSeasonal = useMemo(
-    () =>
-      skyData
-        ? skyData.skyDataIndex.getUpcomingSeasonalEntries(now).slice(0, 4)
-        : [],
-    [now, skyData],
-  );
+  const [nextSeasonal, setNextSeasonal] = useState<SkyCalendarEntry[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getUpcomingSkySeasonalEntries(now).then((entries) => {
+      if (!cancelled) {
+        setNextSeasonal(entries.slice(0, 4));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [now]);
 
   return (
     <>
@@ -449,7 +446,7 @@ export function CalendarPage({
   selectedDate: Date;
   planner: PlannerState;
 }) {
-  const skyData = useSkyData();
+  const [entries, setEntries] = useState<SkyCalendarEntry[]>([]);
   const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
   const startIso = toDateIso(monthStart);
   const endIso = addDaysIso(startIso, 41);
@@ -466,17 +463,23 @@ export function CalendarPage({
       planner.calendarFilters.travelingSpirits,
     ],
   );
-  const entries = useMemo(
-    () =>
-      skyData
-        ? skyData.skyDataIndex.getCalendarEntries({
-            startDate: startIso,
-            endDate: endIso,
-            kinds: filterKinds,
-          })
-        : [],
-    [endIso, filterKinds, skyData, startIso],
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    void getSkyCalendarEntries({
+      startDate: startIso,
+      endDate: endIso,
+      kinds: filterKinds,
+    }).then((nextEntries) => {
+      if (!cancelled) {
+        setEntries(nextEntries);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [endIso, filterKinds, startIso]);
   const goals = planner.calendarFilters.goals
     ? planner.goals.filter((goal) => goal.dueDate && goal.dueDate >= startIso && goal.dueDate <= endIso)
     : [];
@@ -540,46 +543,108 @@ export function RoutesPage({
   planner: PlannerState;
   onPlannerChange: (planner: PlannerState) => void;
 }) {
-  const skyData = useSkyData();
-  const realms = useMemo(() => skyData?.skyDataIndex.getRealms() ?? [], [skyData]);
+  const [realms, setRealms] = useState<SkyRealmSummary[]>([]);
+  const [areas, setAreas] = useState<SkyAreaSummary[]>([]);
+  const [areaRoute, setAreaRoute] = useState<SkyAreaRoute | null>(null);
+  const [routeTargets, setRouteTargets] = useState<SkyRouteTarget[]>([]);
+  const [routeState, setRouteState] = useState<SkyActiveRouteTargetState | null>(null);
+  const [connections, setConnections] = useState<Array<{ guid: string; name: string }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getSkyRealms().then((nextRealms) => {
+      if (!cancelled) {
+        setRealms(nextRealms);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectedRealmGuid =
     planner.activeRoute.realmGuid ?? realms.find((realm) => realm.areaGuids.length > 0)?.guid;
-  const areas = useMemo(
-    () =>
-      skyData && selectedRealmGuid
-        ? skyData.skyDataIndex.getAreasForRealm(selectedRealmGuid)
-        : [],
-    [selectedRealmGuid, skyData],
-  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedRealmGuid) {
+      setAreas([]);
+      return;
+    }
+
+    void getSkyAreasForRealm(selectedRealmGuid).then((nextAreas) => {
+      if (!cancelled) {
+        setAreas(nextAreas);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRealmGuid]);
+
   const selectedAreaGuid =
     planner.activeRoute.areaGuid ?? areas.find((area) => area.spiritGuids.length + area.wingedLightGuids.length > 0)?.guid;
-  const areaRoute = selectedAreaGuid && skyData
-    ? skyData.skyDataIndex.getAreaRoute(selectedAreaGuid)
-    : null;
-  const routeTargets = useMemo(
-    () =>
-      selectedAreaGuid && skyData
-        ? skyData.skyDataIndex.getRouteTargets(
-            selectedAreaGuid,
-            planner.activeRoute.filters,
-          )
-        : [],
-    [planner.activeRoute.filters, selectedAreaGuid, skyData],
-  );
-  const activeTarget =
-    skyData?.skyDataIndex.getActiveRouteTarget(
-      planner.activeRoute,
-      planner.routeProgress,
-    )?.target ?? routeTargets[0] ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedAreaGuid) {
+      setAreaRoute(null);
+      setRouteTargets([]);
+      setRouteState(null);
+      return;
+    }
+
+    void Promise.all([
+      getSkyAreaRoute(selectedAreaGuid),
+      getSkyRouteTargets(selectedAreaGuid, planner.activeRoute.filters),
+      getSkyActiveRouteTarget(planner.activeRoute, planner.routeProgress),
+    ]).then(([nextAreaRoute, nextRouteTargets, nextRouteState]) => {
+      if (!cancelled) {
+        setAreaRoute(nextAreaRoute);
+        setRouteTargets(nextRouteTargets);
+        setRouteState(nextRouteState);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [planner.activeRoute, planner.routeProgress, selectedAreaGuid]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!areaRoute) {
+      setConnections([]);
+      return;
+    }
+
+    void Promise.all(areaRoute.connectionGuids.map((guid) => getSkyArea(guid))).then(
+      (nextConnections) => {
+        if (!cancelled) {
+          setConnections(
+            nextConnections.filter(
+              (area): area is SkyAreaSummary => area !== null,
+            ),
+          );
+        }
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [areaRoute]);
+
+  const activeTarget = routeState?.target ?? routeTargets[0] ?? null;
   const completedCount = routeTargets.filter(
     (target) => planner.routeProgress.completedTargets[target.guid],
   ).length;
-  const connections =
-    skyData && areaRoute
-      ? areaRoute.connectionGuids
-          .map((guid) => skyData.skyDataIndex.getArea(guid))
-          .filter(Boolean)
-      : [];
 
   function updateRoute(input: {
     realmGuid?: string;
@@ -588,8 +653,7 @@ export function RoutesPage({
     wingedLights?: boolean;
   }) {
     const nextRealmGuid = input.realmGuid ?? selectedRealmGuid;
-    const nextAreas =
-      skyData && nextRealmGuid ? skyData.skyDataIndex.getAreasForRealm(nextRealmGuid) : [];
+    const nextAreas = input.realmGuid && input.realmGuid !== selectedRealmGuid ? [] : areas;
     const nextAreaGuid =
       input.areaGuid ??
       (input.realmGuid
@@ -640,7 +704,7 @@ export function RoutesPage({
                 onChange={(event) =>
                   updateRoute({ realmGuid: event.target.value })
                 }
-                disabled={!skyData}
+                disabled={realms.length === 0}
               >
                 {realms.map((realm) => (
                   <NativeSelectOption key={realm.guid} value={realm.guid}>
@@ -658,13 +722,12 @@ export function RoutesPage({
                 onChange={(event) =>
                   updateRoute({ areaGuid: event.target.value })
                 }
-                disabled={!skyData || areas.length === 0}
+                disabled={areas.length === 0}
               >
                 {areas.map((area) => {
-                  const route = skyData?.skyDataIndex.getAreaRoute(area.guid);
                   return (
                     <NativeSelectOption key={area.guid} value={area.guid}>
-                      {area.name} ({route?.counts.total ?? 0})
+                      {area.name} ({area.spiritGuids.length + area.wingedLightGuids.length})
                     </NativeSelectOption>
                   );
                 })}
@@ -714,7 +777,7 @@ export function RoutesPage({
             activeTarget={activeTarget}
             completedCount={completedCount}
             totalCount={routeTargets.length}
-            connections={connections as Array<{ guid: string; name: string }>}
+            connections={connections}
           />
           <Card>
             <CardHeader>
@@ -736,7 +799,7 @@ export function RoutesPage({
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {skyData ? "No route targets match these filters." : "Loading route data..."}
+                  {selectedAreaGuid ? "No route targets match these filters." : "Loading route data..."}
                 </p>
               )}
             </CardContent>
@@ -754,22 +817,69 @@ export function CandleRunsPage({
   planner: PlannerState;
   onPlannerChange: (planner: PlannerState) => void;
 }) {
-  const skyData = useSkyData();
-  const runs = useMemo(
-    () => skyData?.skyDataIndex.getCandleRuns() ?? [],
-    [skyData],
-  );
+  const [runs, setRuns] = useState<SkyCandleRunSummary[]>([]);
+  const [selectedRun, setSelectedRun] = useState<SkyCandleRun | null>(null);
+  const [runGroupsByGuid, setRunGroupsByGuid] = useState<Record<string, SkyCandleGroup[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getSkyCandleRuns().then((nextRuns) => {
+      if (!cancelled) {
+        setRuns(nextRuns);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all(runs.map((run) => getSkyCandleRun(run.guid))).then(
+      (details) => {
+        if (!cancelled) {
+          setRunGroupsByGuid(
+            Object.fromEntries(
+              details
+                .filter((run): run is SkyCandleRun => run !== null)
+                .map((run) => [run.guid, run.groups]),
+            ),
+          );
+        }
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [runs]);
+
   const fallbackRunGuid = runs[0]?.guid;
-  const storedRun =
-    planner.candleRun.activeRunGuid && skyData
-      ? skyData.skyDataIndex.getCandleRun(planner.candleRun.activeRunGuid)
-      : null;
-  const selectedRun =
-    storedRun ??
-    (fallbackRunGuid && skyData
-      ? skyData.skyDataIndex.getCandleRun(fallbackRunGuid)
-      : null);
   const selectedRunGuid = selectedRun?.guid ?? fallbackRunGuid;
+
+  useEffect(() => {
+    let cancelled = false;
+    const runGuid = planner.candleRun.activeRunGuid ?? fallbackRunGuid;
+
+    if (!runGuid) {
+      setSelectedRun(null);
+      return;
+    }
+
+    void getSkyCandleRun(runGuid).then((run) => {
+      if (!cancelled) {
+        setSelectedRun(run);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackRunGuid, planner.candleRun.activeRunGuid]);
+
   const currentSessionDate = new Date().toISOString().slice(0, 10);
   const runGroupKeys = selectedRun
     ? selectedRun.groups.map((group, index) =>
@@ -855,7 +965,7 @@ export function CandleRunsPage({
                   completedGroups={countCompletedRunGroups(
                     run.guid,
                     planner.candleRun.completedGroups,
-                    skyData?.skyDataIndex.getCandleRun(run.guid)?.groups ?? [],
+                    runGroupsByGuid[run.guid] ?? [],
                   )}
                   onClick={() => selectRun(run.guid)}
                 />
@@ -930,7 +1040,7 @@ export function CandleRunsPage({
                 })
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  {skyData ? "No candle run selected." : "Loading candle data..."}
+                  {runs.length > 0 ? "No candle run selected." : "Loading candle data..."}
                 </p>
               )}
             </CardContent>
@@ -1033,11 +1143,24 @@ export function CollectionPage({
   onPlannerChange: (planner: PlannerState) => void;
 }) {
   const [query, setQuery] = useState("");
-  const skyData = useSkyData();
-  const items = useMemo(
-    () => (skyData ? skyData.skyDataIndex.searchItems(query) : []),
-    [query, skyData],
-  );
+  const [items, setItems] = useState<SkyItemSummary[]>([]);
+  const [itemsLoaded, setItemsLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setItemsLoaded(false);
+    void searchSkyItems({ query }).then((nextItems) => {
+      if (!cancelled) {
+        setItems(nextItems);
+        setItemsLoaded(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
 
   return (
     <>
@@ -1070,7 +1193,7 @@ export function CollectionPage({
             ))
           ) : (
             <div className="rounded-md border border-border bg-card/80 p-3 text-sm text-muted-foreground">
-              {skyData ? "No items match this search." : "Loading planner data..."}
+              {itemsLoaded ? "No items match this search." : "Loading planner data..."}
             </div>
           )}
         </div>
@@ -2301,22 +2424,38 @@ export function Overlay({
     [events, settings.overlay.maxEvents],
   );
   const rowRadius = Math.max(0, Math.min(settings.overlay.cornerRadius - 6, 18));
-  const routeState = planner
-    ? skyDataIndex.getActiveRouteTarget(
-        planner.activeRoute,
-        planner.routeProgress,
-      )
-    : null;
-  const activeArea = planner?.activeRoute.areaGuid
-    ? skyDataIndex.getAreaRoute(planner.activeRoute.areaGuid)
-    : null;
-  const miniMapPins = (planner?.activeRoute.areaGuid
-    ? skyDataIndex.getMiniMapPins(
-        planner.activeRoute.areaGuid,
-        planner.activeRoute.filters,
-      )
-    : []
-  );
+  const [routeState, setRouteState] = useState<SkyActiveRouteTargetState | null>(null);
+  const [activeArea, setActiveArea] = useState<SkyAreaRoute | null>(null);
+  const [miniMapPins, setMiniMapPins] = useState<SkyMiniMapPin[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const areaGuid = planner?.activeRoute.areaGuid;
+
+    if (!planner || !areaGuid) {
+      setRouteState(null);
+      setActiveArea(null);
+      setMiniMapPins([]);
+      return;
+    }
+
+    void Promise.all([
+      getSkyActiveRouteTarget(planner.activeRoute, planner.routeProgress),
+      getSkyAreaRoute(areaGuid),
+      getSkyMiniMapPins(areaGuid, planner.activeRoute.filters),
+    ]).then(([nextRouteState, nextActiveArea, nextPins]) => {
+      if (!cancelled) {
+        setRouteState(nextRouteState);
+        setActiveArea(nextActiveArea);
+        setMiniMapPins(nextPins);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [planner]);
+
   const overlayMode =
     settings.overlay.mode === "mini-map" && (!activeArea?.imageUrl || miniMapPins.length === 0)
       ? "route"
@@ -2473,7 +2612,7 @@ function RouteOverlayContent({
   rowRadius,
   showHeader = true,
 }: {
-  routeState: ReturnType<typeof skyDataIndex.getActiveRouteTarget>;
+  routeState: SkyActiveRouteTargetState | null;
   activeArea: SkyAreaRoute | null;
   nextEvent?: EventInstance;
   settings: AppSettings;
@@ -2553,9 +2692,9 @@ function MiniMapOverlayContent({
   settings,
   rowRadius,
 }: {
-  routeState: ReturnType<typeof skyDataIndex.getActiveRouteTarget>;
+  routeState: SkyActiveRouteTargetState | null;
   activeArea: SkyAreaRoute | null;
-  pins: ReturnType<typeof skyDataIndex.getMiniMapPins>;
+  pins: SkyMiniMapPin[];
   planner?: PlannerState;
   settings: AppSettings;
   rowRadius: number;
@@ -2654,9 +2793,9 @@ function ClockRouteOverlayContent({
   settings,
   rowRadius,
 }: {
-  routeState: ReturnType<typeof skyDataIndex.getActiveRouteTarget>;
+  routeState: SkyActiveRouteTargetState | null;
   activeArea: SkyAreaRoute | null;
-  pins: ReturnType<typeof skyDataIndex.getMiniMapPins>;
+  pins: SkyMiniMapPin[];
   planner?: PlannerState;
   events: EventInstance[];
   settings: AppSettings;

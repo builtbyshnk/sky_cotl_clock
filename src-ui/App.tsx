@@ -43,7 +43,6 @@ import {
 } from "@/domain/planner";
 import { applyAppearance, resolveTheme } from "@/domain/theme";
 import type { AppSettings, EventInstance } from "@/domain/types";
-import { skyDataIndex } from "@/data/skygame";
 import {
   configureOverlayWindow,
   getWindowLabel,
@@ -57,6 +56,10 @@ import {
   generateEventInstances as generateEventInstancesFromTauri,
   getOverlayEvents as getOverlayEventsFromTauri,
 } from "@/tauri/events";
+import {
+  getSkyActiveRouteTarget,
+  getSkyRouteTargets,
+} from "@/tauri/skygame";
 import { isGameProcessRunning } from "@/tauri/game-detection";
 import {
   CalendarPage,
@@ -206,6 +209,8 @@ function App() {
   const [overlayEvents, setOverlayEvents] = useState<EventInstance[]>(() =>
     getOverlayEventsFallback(now, settings),
   );
+  const [routeTargetCount, setRouteTargetCount] = useState(0);
+  const [activeRouteTargetGuid, setActiveRouteTargetGuid] = useState<string | null>(null);
   const [windowLabel, setWindowLabel] = useState<string | null>(null);
   const [hotkeyError, setHotkeyError] = useState("");
   const [updateState, setUpdateState] = useState<AppUpdateState>(initialUpdateState);
@@ -412,19 +417,6 @@ function App() {
       return;
     }
 
-    const getRouteTargetCount = () =>
-      planner.activeRoute.areaGuid
-        ? skyDataIndex.getRouteTargets(
-            planner.activeRoute.areaGuid,
-            planner.activeRoute.filters,
-          ).length
-        : 0;
-    const getActiveTargetGuid = () =>
-      skyDataIndex.getActiveRouteTarget(
-        planner.activeRoute,
-        planner.routeProgress,
-      )?.target.guid ?? null;
-
     void registerAppHotkeys(settings, setHotkeyError, {
       cycleOverlayMode: () =>
         setSettings((current) => ({
@@ -436,16 +428,17 @@ function App() {
         })),
       nextRouteTarget: () =>
         setPlanner((current) =>
-          moveActiveRouteTarget(current, 1, getRouteTargetCount()),
+          moveActiveRouteTarget(current, 1, routeTargetCount),
         ),
       previousRouteTarget: () =>
         setPlanner((current) =>
-          moveActiveRouteTarget(current, -1, getRouteTargetCount()),
+          moveActiveRouteTarget(current, -1, routeTargetCount),
         ),
       toggleRouteTargetComplete: () => {
-        const targetGuid = getActiveTargetGuid();
-        if (targetGuid) {
-          setPlanner((current) => toggleRouteTargetComplete(current, targetGuid));
+        if (activeRouteTargetGuid) {
+          setPlanner((current) =>
+            toggleRouteTargetComplete(current, activeRouteTargetGuid),
+          );
         }
       },
       toggleMiniMapExpanded: () =>
@@ -454,6 +447,8 @@ function App() {
   }, [
     planner.activeRoute,
     planner.routeProgress,
+    activeRouteTargetGuid,
+    routeTargetCount,
     settings.hotkeys.cycleOverlayMode,
     settings.hotkeys.nextRouteTarget,
     settings.hotkeys.previousRouteTarget,
@@ -464,6 +459,31 @@ function App() {
     settings.overlay.enabled,
     windowLabel,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const areaGuid = planner.activeRoute.areaGuid;
+
+    if (!areaGuid) {
+      setRouteTargetCount(0);
+      setActiveRouteTargetGuid(null);
+      return;
+    }
+
+    void Promise.all([
+      getSkyRouteTargets(areaGuid, planner.activeRoute.filters),
+      getSkyActiveRouteTarget(planner.activeRoute, planner.routeProgress),
+    ]).then(([targets, active]) => {
+      if (!cancelled) {
+        setRouteTargetCount(targets.length);
+        setActiveRouteTargetGuid(active?.target.guid ?? null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [planner.activeRoute, planner.routeProgress]);
 
   useEffect(() => {
     if (

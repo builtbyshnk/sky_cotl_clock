@@ -12,13 +12,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  addDaysIso,
   type SkyCalendarEntry,
   type SkyCalendarEntryKind,
 } from "@/data/skygame";
 import { cn } from "@/lib/utils";
-
-type SkyDataModule = typeof import("@/data/skygame");
+import { getSkyCalendarEntries } from "@/tauri/skygame";
 
 const kindLabels: Record<SkyCalendarEntryKind, string> = {
   season: "Season",
@@ -42,29 +40,17 @@ const SidebarCalendarContext = React.createContext<{
   entriesByDate: Map<string, SkyCalendarEntry[]>;
 }>({ entriesByDate: new Map() });
 
-function useSkyData() {
-  const [module, setModule] = useState<SkyDataModule | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    void import("@/data/skygame").then((loaded) => {
-      if (mounted) {
-        setModule(loaded);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return module;
-}
-
 function toDateIso(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function addDaysIso(date: string, days: number) {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
 }
 
 function buildEntriesByDate(
@@ -208,8 +194,8 @@ export function SidebarCalendar({
   onSelectedDateChange: (date: Date) => void;
   onOpenCalendar?: () => void;
 }) {
-  const skyData = useSkyData();
   const [visibleMonth, setVisibleMonth] = useState(selectedDate);
+  const [entries, setEntries] = useState<SkyCalendarEntry[]>([]);
 
   useEffect(() => {
     setVisibleMonth(selectedDate);
@@ -225,17 +211,23 @@ export function SidebarCalendar({
   );
   const gridEndIso = addDaysIso(gridStartIso, 41);
 
-  const entries = useMemo(
-    () =>
-      skyData
-        ? skyData.skyDataIndex.getCalendarEntries({
-            startDate: gridStartIso,
-            endDate: gridEndIso,
-            kinds: ["season", "event", "traveling-spirit"],
-          })
-        : [],
-    [gridEndIso, gridStartIso, skyData],
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    void getSkyCalendarEntries({
+      startDate: gridStartIso,
+      endDate: gridEndIso,
+      kinds: ["season", "event", "traveling-spirit"],
+    }).then((nextEntries) => {
+      if (!cancelled) {
+        setEntries(nextEntries);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gridEndIso, gridStartIso]);
 
   const seasonEntries = useMemo(
     () => entries.filter((entry) => entry.kind === "season"),

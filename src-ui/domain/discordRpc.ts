@@ -1,6 +1,5 @@
 import type { AppSettings, EventInstance } from "./types";
 import type { PlannerState } from "./planner";
-import { countCandleGroupWax, skyDataIndex } from "@/data/skygame";
 
 export const ISEKAI_DISCORD_URL =
   "https://github.com/radcolor-dev/sky_cotl_clock";
@@ -131,52 +130,11 @@ function eventPresence(events: EventInstance[]): PresenceSource | null {
 }
 
 function candleRunPresence(planner: PlannerState): PresenceSource | null {
-  const runGuid =
-    planner.candleRun.activeRunGuid ?? skyDataIndex.getCandleRuns()[0]?.guid;
-  const run = runGuid ? skyDataIndex.getCandleRun(runGuid) : null;
-  if (!run) {
-    return null;
-  }
-
-  const completedGroups = run.groups.filter((group, index) =>
-    planner.candleRun.completedGroups[candleGroupKey(run.guid, group.name, index)],
-  ).length;
-  const totalWax = run.groups.reduce(
-    (total, group) => total + countCandleGroupWax(group),
-    0,
-  );
-  const completedWax = run.groups.reduce((total, group, index) => {
-    if (!planner.candleRun.completedGroups[candleGroupKey(run.guid, group.name, index)]) {
-      return total;
-    }
-
-    return total + countCandleGroupWax(group);
-  }, 0);
-
-  return {
-    details: `Candle run: ${run.name}`,
-    state: `${completedGroups}/${run.groups.length} groups, ${completedWax}/${totalWax} wax`,
-  };
+  return planner.candleRun.activeRunGuid ? presetPresence("farmingWax") : null;
 }
 
 function routePresence(planner: PlannerState): PresenceSource | null {
-  const active = skyDataIndex.getActiveRouteTarget(
-    planner.activeRoute,
-    planner.routeProgress,
-  );
-  const area = planner.activeRoute.areaGuid
-    ? skyDataIndex.getArea(planner.activeRoute.areaGuid)
-    : null;
-  if (!active || !area) {
-    return null;
-  }
-
-  const realmName = area.realmName ? `${area.realmName} - ` : "";
-
-  return {
-    details: `Route: ${realmName}${area.name}`,
-    state: `${active.completedCount}/${active.total} targets complete`,
-  };
+  return planner.activeRoute.areaGuid ? presetPresence("planning") : null;
 }
 
 function goalsPresence(planner: PlannerState): PresenceSource | null {
@@ -235,10 +193,6 @@ function presetPresence(
   };
 
   return presets[preset] ?? presets.planning;
-}
-
-function candleGroupKey(runGuid: string, groupName: string, index: number) {
-  return `${runGuid}:${index}:${groupName}`;
 }
 
 function clampDiscordField(value: string) {
