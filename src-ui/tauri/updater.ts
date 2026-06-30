@@ -1,4 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { isTauriRuntime } from "@/tauri/overlay";
 
@@ -45,6 +46,13 @@ interface GitHubRelease {
 }
 
 async function fetchReleaseNotesForVersion(version: string) {
+  if (isTauriRuntime()) {
+    return invoke<Pick<AppUpdateState, "releaseDate" | "releaseNotes">>(
+      "fetch_release_notes_for_version",
+      { version },
+    );
+  }
+
   const releaseTags = [`v${version}`];
 
   for (const tag of releaseTags) {

@@ -28,10 +28,7 @@ import {
   generateEventInstances as generateEventInstancesFallback,
   getOverlayEvents as getOverlayEventsFallback,
 } from "@/domain/events";
-import {
-  buildDiscordRpcPresence,
-  type DiscordRpcPresencePayload,
-} from "@/domain/discordRpc";
+import type { DiscordRpcPresencePayload } from "@/domain/discordRpc";
 import {
   deserializePlannerState,
   moveActiveRouteTarget,
@@ -85,6 +82,7 @@ import {
   type UpdateStatePatch,
 } from "@/tauri/updater";
 import {
+  buildDiscordRpcPresenceFromTauri,
   clearDiscordRpc,
   getDiscordRpcStatusForClient,
   updateDiscordRpc,
@@ -215,6 +213,8 @@ function App() {
   const [hotkeyError, setHotkeyError] = useState("");
   const [updateState, setUpdateState] = useState<AppUpdateState>(initialUpdateState);
   const [skyProcessRunning, setSkyProcessRunning] = useState(false);
+  const [discordRpcPresence, setDiscordRpcPresence] =
+    useState<DiscordRpcPresencePayload | null>(null);
   const [discordRpcStatus, setDiscordRpcStatus] = useState<DiscordRpcStatus>({
     configured: false,
     connected: false,
@@ -816,17 +816,26 @@ function App() {
       cancelled = true;
     };
   }, [now, settings]);
-  const discordRpcPresence = useMemo(
-    () =>
-      buildDiscordRpcPresence({
-        settings,
-        events,
-        planner,
-        skyProcessRunning,
-        sessionStartedAtMs: discordRpcSessionStartedAt.current,
-      }),
-    [events, planner, settings, skyProcessRunning],
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    void buildDiscordRpcPresenceFromTauri({
+      settings,
+      events,
+      planner,
+      skyProcessRunning,
+      sessionStartedAtMs: discordRpcSessionStartedAt.current,
+    }).then((presence) => {
+      if (!cancelled) {
+        setDiscordRpcPresence(presence);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [events, planner, settings, skyProcessRunning]);
+
   const discordRpcPresenceKey = useMemo(
     () => JSON.stringify(discordRpcPresence),
     [discordRpcPresence],

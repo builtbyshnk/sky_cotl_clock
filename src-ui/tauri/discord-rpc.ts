@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "@/tauri/overlay";
-import type { DiscordRpcPresencePayload } from "@/domain/discordRpc";
+import {
+  buildDiscordRpcPresence as buildDiscordRpcPresenceFallback,
+  type DiscordRpcBuildInput,
+  type DiscordRpcPresencePayload,
+} from "@/domain/discordRpc";
 
 export interface DiscordRpcStatus {
   configured: boolean;
@@ -54,4 +58,16 @@ export async function clearDiscordRpc() {
   }
 
   await invoke<DiscordRpcStatus>("discord_rpc_clear");
+}
+
+export async function buildDiscordRpcPresenceFromTauri(
+  input: DiscordRpcBuildInput,
+): Promise<DiscordRpcPresencePayload | null> {
+  if (!isTauriRuntime()) {
+    return buildDiscordRpcPresenceFallback(input);
+  }
+
+  return invoke<DiscordRpcPresencePayload | null>("build_discord_rpc_presence", {
+    payload: input,
+  });
 }
