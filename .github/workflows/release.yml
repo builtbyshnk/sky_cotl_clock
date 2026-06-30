@@ -35,9 +35,9 @@ jobs:
           - name: macOS DMG
             os: macos-latest
             tauriArgs: --target aarch64-apple-darwin --bundles dmg --no-sign
-          - name: Linux AppImage
+          - name: Linux AppImage and DEB
             os: ubuntu-latest
-            tauriArgs: --bundles appimage
+            tauriArgs: --bundles appimage,deb
 
     permissions:
       contents: write
@@ -93,7 +93,7 @@ jobs:
 
       - name: Build and publish Tauri release
         if: github.event_name != 'workflow_dispatch' || inputs.buildOnly != true
-        uses: tauri-apps/tauri-action@v0.6.2
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
