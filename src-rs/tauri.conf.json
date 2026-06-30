@@ -50,12 +50,6 @@
     "active": true,
     "targets": ["msi"],
     "createUpdaterArtifacts": true,
-    "windows": {
-      "webviewInstallMode": {
-        "type": "fixedRuntime",
-        "path": "./Microsoft.WebView2.FixedVersionRuntime.149.0.4022.98.x64/"
-      }
-    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

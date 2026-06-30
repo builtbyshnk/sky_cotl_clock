@@ -2,7 +2,7 @@
 # will have compiled files and executables
 /target/
 
-# Downloaded for fixed WebView2 runtime packaging.
+# Keep locally downloaded WebView2 runtime packages out of Git.
 /Microsoft.WebView2.FixedVersionRuntime.*.x64/
 /*.FixedVersionRuntime.*.cab
 
