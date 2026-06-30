@@ -1,0 +1,77 @@
+name: Debug Build Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows MSI
+            os: windows-latest
+            tauriArgs: --debug --bundles msi --no-sign
+          - name: macOS DMG
+            os: macos-latest
+            tauriArgs: --debug --target aarch64-apple-darwin --bundles dmg --no-sign
+          - name: Linux AppImage
+            os: ubuntu-latest
+            tauriArgs: --debug --bundles appimage --no-sign
+          - name: Linux DEB
+            os: ubuntu-latest
+            tauriArgs: --debug --bundles deb --no-sign
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install macOS Rust target
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-rs -> target"
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build debug bundle
+        uses: tauri-apps/tauri-action@v1
+        with:
+          tauriScript: bun run tauri
+          args: ${{ matrix.tauriArgs }} --config '{"bundle":{"createUpdaterArtifacts":false}}' --ci
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: "debug-[platform]-[arch]-[bundle]"
