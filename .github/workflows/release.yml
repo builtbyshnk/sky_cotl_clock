@@ -29,9 +29,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows MSI
+          - name: Windows NSIS
             os: windows-latest
-            tauriArgs: --bundles msi
+            tauriArgs: --bundles nsis
           - name: macOS DMG
             os: macos-latest
             tauriArgs: --target aarch64-apple-darwin --bundles dmg --no-sign
@@ -107,7 +107,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
-          updaterJsonPreferNsis: false
+          updaterJsonPreferNsis: true
           releaseAssetNamePattern: "[name]_[version]_[platform]_[arch].[ext]"
 
   notify-discord:

@@ -12,9 +12,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Windows MSI
+          - name: Windows NSIS
             os: windows-latest
-            tauriArgs: --debug --bundles msi --no-sign
+            tauriArgs: --debug --bundles nsis --no-sign
           - name: macOS DMG
             os: macos-latest
             tauriArgs: --debug --target aarch64-apple-darwin --bundles dmg --no-sign
