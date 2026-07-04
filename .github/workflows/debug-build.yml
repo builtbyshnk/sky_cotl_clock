@@ -24,6 +24,9 @@ jobs:
           - name: Linux DEB
             os: ubuntu-latest
             tauriArgs: --debug --bundles deb --no-sign
+          - name: Linux RPM
+            os: ubuntu-latest
+            tauriArgs: --debug --bundles rpm --no-sign
 
     permissions:
       contents: read
@@ -58,7 +61,8 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            rpm
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2

@@ -35,9 +35,9 @@ jobs:
           - name: macOS DMG
             os: macos-latest
             tauriArgs: --target aarch64-apple-darwin --bundles dmg --no-sign
-          - name: Linux AppImage and DEB
+          - name: Linux AppImage, DEB, and RPM
             os: ubuntu-latest
-            tauriArgs: --bundles appimage,deb
+            tauriArgs: --bundles appimage,deb,rpm
 
     permissions:
       contents: write
@@ -72,7 +72,8 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            rpm
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
