@@ -2,6 +2,9 @@
 
 Isekai is a lightweight Sky: Children of the Light desktop clock and planner for players who want Sky-time countdowns, local goals, and a quick overlay without relying on browser tabs. It runs locally, stores planner data on your device, and keeps setup simple with no Sky login or cloud account.
 
+Website: https://builtbyshnk.github.io/sky_cotl_clock/
+Repository: https://github.com/builtbyshnk/sky_cotl_clock
+
 ## Features
 
 - 🪶 **Light on your PC** - Low CPU and memory use leaves plenty of headroom for Sky.

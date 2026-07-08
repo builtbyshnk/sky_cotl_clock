@@ -62,7 +62,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYzNEI2Q0M4OEI4NTc2N0QKUldSOWRvV0x5R3hMODV1RmJxbS9RaEdjNk1nMTR1UGxWZDg0MUpiZEJFeEN4bTZQaEo5d3lNTnIK",
       "endpoints": [
-        "https://github.com/radcolor-dev/sky_cotl_clock/releases/latest/download/latest.json"
+        "https://github.com/builtbyshnk/sky_cotl_clock/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

@@ -24,7 +24,7 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const DISCORD_CLIENT_ID: Option<&str> = option_env!("ISEKAI_DISCORD_CLIENT_ID");
-const ISEKAI_DISCORD_URL: &str = "https://github.com/radcolor-dev/sky_cotl_clock";
+const ISEKAI_DISCORD_URL: &str = "https://github.com/builtbyshnk/sky_cotl_clock";
 const SKY_DISCORD_URL: &str = "https://www.thatskygame.com/";
 const MAX_DISCORD_FIELD_LENGTH: usize = 128;
 
@@ -211,7 +211,7 @@ fn build_discord_rpc_presence(payload: DiscordRpcBuildPayload) -> Option<Value> 
 async fn fetch_release_notes_for_version(version: String) -> ReleaseNotes {
     let tag = format!("v{version}");
     let url = format!(
-        "https://api.github.com/repos/radcolor-dev/sky_cotl_clock/releases/tags/{}",
+        "https://api.github.com/repos/builtbyshnk/sky_cotl_clock/releases/tags/{}",
         tag
     );
     let response = reqwest::Client::new()

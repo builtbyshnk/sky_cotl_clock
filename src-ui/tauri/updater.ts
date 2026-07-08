@@ -58,7 +58,7 @@ async function fetchReleaseNotesForVersion(version: string) {
   for (const tag of releaseTags) {
     try {
       const response = await fetch(
-        `https://api.github.com/repos/radcolor-dev/sky_cotl_clock/releases/tags/${encodeURIComponent(tag)}`,
+        `https://api.github.com/repos/builtbyshnk/sky_cotl_clock/releases/tags/${encodeURIComponent(tag)}`,
         {
           headers: {
             Accept: "application/vnd.github+json",
